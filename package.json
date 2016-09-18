@@ -14,7 +14,10 @@
   "license": "UNLICENSED",
   "private": true,
   "dependencies": {
+    "cookie-parser": "^1.4.3",
     "express": "^4.14.0",
+    "node-uuid": "^1.4.7",
+    "redis": "^2.6.2",
     "serve-static": "^1.11.1"
   }
 }

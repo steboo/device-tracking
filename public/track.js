@@ -1,115 +1,7 @@
 (function () {
-  var fixedDevice = [
-    'screen.height', screen.height,
-    'screen.width', screen.width,
-    'screen.colorDepth', screen.colorDepth, // not actually always 24
-    'screen.pixelDepth', screen.pixelDepth // probably not actually always 24
-  ];
-
-  var variableDevice = [
-    'screen.brightness', screen.brightness,
-    'screen.mozBrightness', screen.mozBrightness,
-    'screen.orientation', screen.orientation ? (screen.orientation.type || screen.mozOrientation) : undefined,
-    'screen.top', screen.top,
-    'screen.left', screen.left
-  ];
-
-  /*
-   * Very browser specific indicators
-   *
-   * navigator
-   *    - appCodeName
-   *    - appName
-   *    - appVersion
-   *    - buildID
-   *    - mimeTypes
-   *    - plugins
-   *    - product
-   *    - productSub
-   *
-   * Browser settings
-   *
-   * navigator
-   *    - cookieEnabled
-   *    - doNotTrack
-   *    - language
-   *    - languages
-   *
-   * navigator
-   *    - battery || mozBattery
-   *    - geolocation
-   *    - oscpu
-   *    - platform
-   *    - userAgent
-   *    - vibrate || mozVibrate
-   * window
-   *    - DeviceMotionEvent
-   *    - DeviceOrientationEvent
-   *    - orientation
-   *
-   *
-   * What?
-   *
-   * navigator
-   *    - mediaDevices
-   *    - mozContacts
-   *    - permissions
-   *    - serviceWorker
-   */
-  var navProps = [
-    'navigator.userAgent', navigator.userAgent,
-    'navigator.battery', navigator.battery,
-    'navigator.mozBattery', navigator.mozBattery,
-    'navigator.vibrate', navigator.vibrate,
-    'navigator.mozVibrate', navigator.mozVibrate,
-    'navigator.connection', navigator.connection,
-    'navigator.geolocation', navigator.geolocation,
-    'navigator.language', navigator.language,
-    'navigator.languages', navigator.languages,
-    'navigator.oscpu', navigator.oscpu,
-    'navigator.platform', navigator.platform,
-    'window.DeviceMotionEvent', window.DeviceMotionEvent,
-    'window.DeviceOrientationEvent', window.DeviceOrientationEvent
-  ];
-
-  var dt, dd, dl = document.createElement('dl');
-  for (var i = 0; i < fixedDevice.length; i += 2) {
-    dt = document.createElement('dt');
-    dt.textContent = fixedDevice[i];
-    dd = document.createElement('dd');
-    dd.textContent = fixedDevice[i+1];
-    dl.appendChild(dt);
-    dl.appendChild(dd);
-  }
-
-  document.getElementsByTagName('main')[0].appendChild(dl);
-
-  dl = document.createElement('dl');
-  for (var i = 0; i < variableDevice.length; i += 2) {
-    dt = document.createElement('dt');
-    dt.textContent = variableDevice[i];
-    dd = document.createElement('dd');
-    dd.textContent = variableDevice[i+1];
-    dl.appendChild(dt);
-    dl.appendChild(dd);
-  }
-
-  document.getElementsByTagName('main')[0].appendChild(dl);
-
-  dl = document.createElement('dl');
-  for (var i = 0; i < navProps.length; i += 2) {
-    dt = document.createElement('dt');
-    dt.textContent = navProps[i];
-    dd = document.createElement('dd');
-    dd.textContent = navProps[i+1];
-    dl.appendChild(dt);
-    dl.appendChild(dd);
-  }
-
-  document.getElementsByTagName('main')[0].appendChild(dl);
-
   function writeCookie(key, value) {
     var date = new Date();
+    // a year is as reasonable a date as any
     date.setDate(date.getYear() + 1);
     document.cookie = key + '=' + value + ';max-age=31536000;expires=' + date.toUTCString();
   }
@@ -122,44 +14,148 @@
         return tokens[1];
       }
     }
-
-    // If not found, return undefined.
   }
-
-  function deleteCookie(key) {
-    // hah!
-    document.cookie = key + '=;expires=Thu, 01 Jan 1970 00:00:01 GMT';
-  }
-
-  var support = {
-  };
 
   function storageAvailable(type) {
+    // Ugly try is necessary for some scenarios in Firefox
     try {
       var storage = window[type],
         x = '__test__';
       storage.setItem(x, x);
       storage.removeItem(x);
-      return true;
+      return storage;
     } catch (e) {
-      return false;
     }
   }
 
-  support.localStorage = storageAvailable('localStorage');
-  support.sessionStorage = storageAvailable('sessionStorage');
-  support.fileSystem = window.requestFileSystem || window.webkitRequestFileSystem;
-  support.indexedDB = window.indexedDB || window.mozIndexedDB || window.webkitIndexedDB || window.msIndexedDB;
-  support.flash = document.SharedObjects || window.SharedObjects;
+  // Feature support table
+  var feature = {
+    localStorage: storageAvailable('localStorage'),
+    sessionStorage: storageAvailable('sessionStorage'),
+    fileSystem: window.requestFileSystem || window.webkitRequestFileSystem,
+    indexedDB: window.indexedDB || window.mozIndexedDB || window.webkitIndexedDB || window.msIndexedDB,
+    flash: document.SharedObjects || window.SharedObjects,
+    webRTC: window.RTCPeerConnection || window.mozRTCPeerConnection || window.webkitRTCPeerConnection
+  };
+
+  var trackingID,
+    key,
+    readComplete = false,
+    ipComplete = false;
+
+  var ip = {
+    ipv4_private: [],
+    ipv4_public: [],
+    ipv6: []
+  };
+
+  function rtc() {
+    console.log('rtc yeah');
+    if (feature.webRTC) {
+      console.log('rtc yeah!!!');
+      var pc = new feature.webRTC({
+        iceServers: [{ urls: 'stun:stun.services.mozilla.com' }]
+      }, {
+        optional: [{ RtpDataChannels: true }]
+      });
+      console.log('omg pc', pc);
+
+      pc.onicecandidate = function (e) {
+        if (e.candidate) {
+          var matches = e.candidate.candidate.match(/(?:\d+\.){3}\d+/);
+          if (matches) {
+            // private IPs, including link-local addresses
+            if (matches[0].match(/(?:10\.|172\.(?:1[6-9]|2\d|3[0-l])\.|192\.168\.|169\.254\.)/)) {
+              // private
+              ip.ipv4_private.push(matches[0]);
+            } else {
+              // public
+              // Note: webRTC does not always return a public IP address
+              ip.ipv4_public.push(matches[0]);
+            }
+
+            console.log('I found an IPv4 address', matches[0]);
+          } else {
+            matches = e.candidate.candidate.match(/\b(?:[a-f0-9]+\:)+[a-f0-9]+\b/gi);
+            if (matches) {
+              console.log('I found an IPv6 address', matches[0]);
+              ip.ipv6.push(matches[0]);
+            } else {
+              console.log('I found a junk ICE candidate', e.candidate);
+            }
+          }
+        } else {
+          console.log('all done', e);
+          ip.ipv4_private.sort();
+          ip.ipv4_public.sort();
+
+          // uniq w/ side effect
+          if (ip.ipv4_private.length > 1) {
+            ip.ipv4_private.reduce(function (p, c, i, a) {
+              if (p == c) {
+                a.splice(i, 1);
+              }
+            });
+          }
+
+          if (ip.ipv4_public.length > 1) {
+            ip.ipv4_public.reduce(function (p, c, i, a) {
+              if (p == c) {
+                a.splice(i, 1);
+              }
+            });
+          }
+
+          var keyArr = [
+            ip.ipv4_private.join('|'),
+            ip.ipv4_public.join('|'),
+            String(screen.width),
+            String(screen.height)
+          ];
+          key = keyArr.join(',');
+          ipComplete = true;
+          if (readComplete) {
+            makeRequest(key, trackingID);
+          }
+        }
+      };
+
+      console.log('hey data chan');
+      pc.createDataChannel('');
+
+      console.log('hey offer');
+      pc.createOffer(function (result) {
+        console.log('createOffer');
+        pc.setLocalDescription(result, function () {
+          console.log('setLocalDescription success');
+        }, function (err) {
+          console.warn('setLocalDescription error', err);
+        });
+      }, function (err) {
+        console.warn('createOffer error', err);
+      });
+    } else {
+      var keyArr = [
+        '',
+        '',
+        String(screen.width),
+        String(screen.height)
+      ];
+      key = keyArr.join(',');
+      ipComplete = true;
+    }
+  }
+
+  rtc();
 
   function writeStorage(type, key, value) {
-    if (support[type]) {
+    if (feature[type]) {
       window[type].setItem(key, value);
     }
   }
 
   function readStorage(type, key, value) {
-    if (support[type]) {
+    if (feature[type]) {
       return window[type].getItem(key);
     }
   }
@@ -169,8 +165,9 @@
   }
 
   function writeFile(key, value) {
-    if (support.fileSystem) {
-      var rfs = support.fileSystem;
+    if (feature.fileSystem) {
+      var rfs = feature.fileSystem;
+      // TEMPORARY doesn't prompt
       rfs(window.TEMPORARY, 256, function (fs) {
         fs.root.getFile(key + '.txt', { create: true }, function (fileEntry) {
           fileEntry.createWriter(function (fileWriter) {
@@ -188,8 +185,8 @@
       cb(null);
     }
 
-    if (support.fileSystem) {
-      var rfs = support.fileSystem;
+    if (feature.fileSystem) {
+      var rfs = feature.fileSystem;
       rfs(window.TEMPORARY, 256, function (fs) {
         fs.root.getFile(key + '.txt', {}, function (fileEntry) {
           fileEntry.file(function (file) {
@@ -217,8 +214,8 @@
 
   IDB.prototype.open = function(cb) {
     var that = this;
-    if (support.indexedDB) {
-      var indexedDB = support.indexedDB;
+    if (feature.indexedDB) {
+      var indexedDB = feature.indexedDB;
       var request = indexedDB.open(this.db_name, this.db_version);
 
       request.onsuccess = function (e) {
@@ -249,7 +246,7 @@
   var idb = new IDB('tracking', 1, 'tracking');
 
   function readIndexedDB(key, cb) {
-    if (support.indexedDB) {
+    if (feature.indexedDB) {
       idb.open(function (db) {
         if (!db) {
           return;
@@ -275,7 +272,7 @@
   }
 
   function writeIndexedDB(key, value, cb) {
-    if (support.indexedDB) {
+    if (feature.indexedDB) {
       idb.open(function (db) {
         if (!db) {
           return;
@@ -304,65 +301,35 @@
   }
 
   var silverlight = null;
-  var silverlightReady = false;
   window.silverlightLoaded = function (sender, args) {
     silverlight = sender.getHost();
-    silverlightReady = true;
+    // TODO: emit event
   };
 
   window.silverlightError = function (sender, args) {
-    var appSource = '';
-
-    if (sender) {
-      appSource = sender.getHost().Source;
-    }
-
     var errorType = args.ErrorType;
     var errorCode = args.ErrorCode;
 
-    if (errorType == "ImageError" || 
-      errorType == "MediaError") {
-      return;
-    }
-
-    var errMsg = "Unhandled Error in Silverlight Application " 
-      + appSource + "\n";
-
-    errMsg += "Code: " + errorCode + "    \n";
-    errMsg += "Category: " + errorType + "       \n";
-    errMsg += "Message: " + args.ErrorMessage + "     \n";
-
-    if (errorType == "ParserError") {
-      errMsg += "File: " + args.xamlFile + "     \n";
-      errMsg += "Line: " + args.lineNumber + "     \n";
-      errMsg += "Position: " + args.charPosition + "     \n";
-    } else if (errorType == "RuntimeError") {
-      if (args.lineNumber != 0) {
-        errMsg += "Line: " + args.lineNumber + "     \n";
-        errMsg += "Position: " + args.charPosition + 
-        "     \n";
-      }
-      errMsg += "MethodName: " + args.methodName + "     \n";
-    }
-
+    console.error('Silverlight error: ' + errorType + ', ' + errorCode);
   };
 
 
   function readFlashSharedObject(key, count, cb) {
+    statusEl.textContent = 'Please wait. Loading Flash shared objects...';
     if (arguments.length == 2) {
       cb = count;
       count = 0;
     }
 
-    if (support.flash) {
-      if (!support.flash.read) {
+    if (feature.flash) {
+      if (!feature.flash.read) {
         if (count++ > 20) {
           return cb();
         }
 
         setTimeout(readFlashSharedObject.bind(this, key, count, cb), 100);
       } else {
-        var val = support.flash.read(key);
+        var val = feature.flash.read(key);
         cb(val);
       }
     } else {
@@ -371,11 +338,11 @@
   }
 
   function writeFlashSharedObject(key, value, cb) {
-    if (support.flash) {
-      if (!support.flash.write) {
+    if (feature.flash) {
+      if (!feature.flash.write) {
         setTimeout(writeFlashSharedObject.bind(this, key, value, cb), 100);
       } else {
-        support.flash.write(key, value);
+        feature.flash.write(key, value);
         cb();
       }
     } else {
@@ -402,6 +369,7 @@
     }
 
     function readIsolatedStorage(key, count, cb) {
+      statusEl.textContent = 'Please wait. Loading Silverlight Isolated Storage...';
       if (arguments.length == 2) {
         cb = count;
         count = 0;
@@ -422,6 +390,7 @@
       }
     }
 
+    // sorry.
     readFile(key, function (val) {
       if (val) {
         return cb(val);
@@ -474,115 +443,163 @@
     });
   }
 
-  var browserIdentifier = 'tracking_time';
-  var dlEl, ddEl, dtEl;
+  var mainEl = document.getElementsByTagName('main')[0];
+  var statusEl = document.createElement('p');
+  statusEl.classname = 'status';
+  statusEl.textContent = 'Please wait. Loading...';
+  mainEl.appendChild(statusEl);
 
-  dlEl = document.createElement('dl');
+  var trackName = 'trackingID';
 
-  dtEl = document.createElement('dt');
-  dtEl.textContent = 'Cookie';
-  dlEl.appendChild(dtEl);
-  ddEl = document.createElement('dd');
-  var cookieVal = readCookie(browserIdentifier);
-  ddEl.textContent = cookieVal ? cookieVal : '';
-  dlEl.appendChild(ddEl);
+  function debugPrint() {
+    var dlEl, ddEl, dtEl;
 
-  dtEl = document.createElement('dt');
-  dtEl.textContent = 'LocalStorage';
-  dlEl.appendChild(dtEl);
-  ddEl = document.createElement('dd');
-  ddEl.textContent = readStorage('localStorage', browserIdentifier);
-  dlEl.appendChild(ddEl);
+    dlEl = document.createElement('dl');
 
-  dtEl = document.createElement('dt');
-  dtEl.textContent = 'SessionStorage';
-  dlEl.appendChild(dtEl);
-  ddEl = document.createElement('dd');
-  ddEl.textContent = readStorage('sessionStorage', browserIdentifier);
-  dlEl.appendChild(ddEl);
-
-
-  readFile(browserIdentifier, function (val) {
-    var dtEl = document.createElement('dt');
-    dtEl.textContent = 'File';
+    dtEl = document.createElement('dt');
+    dtEl.textContent = 'Cookie';
     dlEl.appendChild(dtEl);
-    var ddEl = document.createElement('dd');
-    ddEl.textContent = val;
+    ddEl = document.createElement('dd');
+    var cookieVal = readCookie(trackName);
+    ddEl.textContent = cookieVal ? cookieVal : '';
     dlEl.appendChild(ddEl);
-  });
 
-  readIndexedDB(browserIdentifier, function (val) {
-    var dtEl = document.createElement('dt');
-    dtEl.textContent = 'IndexedDB';
+    dtEl = document.createElement('dt');
+    dtEl.textContent = 'LocalStorage';
     dlEl.appendChild(dtEl);
-    var ddEl = document.createElement('dd');
-    ddEl.textContent = val;
+    ddEl = document.createElement('dd');
+    ddEl.textContent = readStorage('localStorage', trackName);
     dlEl.appendChild(ddEl);
-  });
 
-  function displaySilverlightValue(count) {
-    if (!count) {
-      count = 0;
-    }
+    dtEl = document.createElement('dt');
+    dtEl.textContent = 'SessionStorage';
+    dlEl.appendChild(dtEl);
+    ddEl = document.createElement('dd');
+    ddEl.textContent = readStorage('sessionStorage', trackName);
+    dlEl.appendChild(ddEl);
 
-    if (!silverlight) {
-      if (count++ > 20) {
-        return;
-      }
-      setTimeout(displaySilverlightValue.bind(this, count), 100);
-    } else {
+    readFile(trackName, function (val) {
       var dtEl = document.createElement('dt');
-      dtEl.textContent = 'Silverlight Isolated Storage';
+      dtEl.textContent = 'File';
       dlEl.appendChild(dtEl);
       var ddEl = document.createElement('dd');
-      try {
-        ddEl.textContent = silverlight.Content.Storage.ReadIsolatedStorage(browserIdentifier);
-      } catch (e) {
-        console.error(e);
-      }
+      ddEl.textContent = val;
       dlEl.appendChild(ddEl);
+    });
+
+    readIndexedDB(trackName, function (val) {
+      var dtEl = document.createElement('dt');
+      dtEl.textContent = 'IndexedDB';
+      dlEl.appendChild(dtEl);
+      var ddEl = document.createElement('dd');
+      ddEl.textContent = val;
+      dlEl.appendChild(ddEl);
+    });
+
+    function displaySilverlightValue(count) {
+      if (!count) {
+        count = 0;
+      }
+
+      if (!silverlight) {
+        if (count++ > 20) {
+          return;
+        }
+        setTimeout(displaySilverlightValue.bind(this, count), 100);
+      } else {
+        var dtEl = document.createElement('dt');
+        dtEl.textContent = 'Silverlight Isolated Storage';
+        dlEl.appendChild(dtEl);
+        var ddEl = document.createElement('dd');
+        try {
+          ddEl.textContent = silverlight.Content.Storage.ReadIsolatedStorage(trackName);
+        } catch (e) {
+          console.error(e);
+        }
+        dlEl.appendChild(ddEl);
+      }
     }
+
+    readFlashSharedObject(trackName, function (val) {
+      var dtEl = document.createElement('dt');
+      dtEl.textContent = 'Flash Shared Object';
+      dlEl.appendChild(dtEl);
+      var ddEl = document.createElement('dd');
+      ddEl.textContent = val;
+      dlEl.appendChild(ddEl);
+    });
+
+    displaySilverlightValue();
+
+    mainEl.appendChild(dlEl);
   }
 
-  readFlashSharedObject(browserIdentifier, function (val) {
-    var dtEl = document.createElement('dt');
-    dtEl.textContent = 'Flash Shared Object';
-    dlEl.appendChild(dtEl);
-    var ddEl = document.createElement('dd');
-    ddEl.textContent = val;
-    dlEl.appendChild(ddEl);
-  });
-
-  displaySilverlightValue();
-
-  document.getElementsByTagName('main')[0].appendChild(dlEl);
-
-  var trackingValue;
-
-  readAllTheThings(browserIdentifier, function (val) {
-    console.log('Read values', val);
-    if (!val) {
+  readAllTheThings(trackName, function (val) {
+    console.log('Browser says trackingID is', val);
+    trackingID = val;
+    var event = new CustomEvent('idready', {
+      'detail': val
+    });
+    window.dispatchEvent(event);
+/*    if (!val) {
       var today = new Date();
       val = today.toISOString(); 
+    }*/
+
+    readComplete = true;
+    if (ipComplete) {
+      makeRequest(key, trackingID);
+    } else {
+      statusEl.textContent = 'Please wait. Loading WebRTC IP addresses...';
     }
 
-    trackingValue = val;
-
-    var pEl = document.createElement('p');
-    pEl.textContent = 'Your device ID is ' + val;
-    document.getElementsByTagName('main')[0].appendChild(pEl);
-
-    writeAllTheThings(browserIdentifier, val, function () {});
   });
 
-  window.addEventListener('ipready', function (e) {
-    console.log(e.detail);
-  }, false);
+  var trackingEl = document.createElement('p');
+  trackingEl.classname = 'useful';
+  mainEl.appendChild(trackingEl);
 
-  // Better close this window before clearing cookies ;)
+  function makeRequest(key, trackingID, doNotCache) {
+    console.log('Making request with', key, trackingID);
+    var xhr = new XMLHttpRequest();
+
+    xhr.onreadystatechange = function() {
+      console.log('onreadystatechange', xhr.readyState);
+      if (xhr.readyState == XMLHttpRequest.DONE) {
+        console.log('status', xhr.status);
+        if (xhr.status < 400) {
+          if (!doNotCache || xhr.responseText) {
+            trackingID = xhr.responseText;
+            trackingEl.textContent = 'Your device ID is ' + trackingID;
+          }
+
+          if (!doNotCache) {
+            statusEl.parentNode.removeChild(statusEl);
+            // we make two requests, one from the cache and one to update
+            // the network info if necessary
+            makeRequest(key, trackingID, true);
+          }
+        } else {
+          console.error('xhr returned error', xhr);
+          statusEl.textContent = 'Error.';
+        }
+        writeAllTheThings(trackName, trackingID, function () {});
+      }
+    };
+
+    // no query params permitted due to app cache. Cookies instead.
+    writeCookie(trackName, trackingID);
+    writeCookie('key', key);
+
+    var today = new Date();
+    xhr.open('GET', 'track.txt' + (doNotCache ? ('?v=' + today.toISOString()) : ''));
+    xhr.send();
+  }
+
+  // Better close this tab before clearing cookies ;)
   var unload = function () {
-    if (trackingValue) {
-      writeCookie(browserIdentifier, trackingValue);
+    if (trackingID) {
+      writeCookie(trackName, trackingID);
     }
   };
 
@@ -595,12 +612,11 @@
         // cached
       }
     }).catch(function (err) {
-      // TODO: https????
       console.warn(err);
     });
   } else {
     var pEl = document.createElement('p');
     pEl.textContent = 'Service workers are not supported in this browser.';
+    mainEl.appendChild(pEl);
   }
-  
 })();
