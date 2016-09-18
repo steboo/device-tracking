@@ -50,15 +50,19 @@
   };
 
   function rtc() {
-    console.log('rtc yeah');
     if (feature.webRTC) {
-      console.log('rtc yeah!!!');
       var pc = new feature.webRTC({
-        iceServers: [{ urls: 'stun:stun.services.mozilla.com' }]
+        iceServers: [
+          { urls: 'stun:stun.l.google.com:19302' },
+          { urls: 'stun:stun.services.mozilla.com' }
+        ],
+        iceTransportPolicy: 'all',
+        rtcpMuxPolicy: 'require'
       }, {
-        optional: [{ RtpDataChannels: true }]
+        optional: [{
+          RtpDataChannels: true
+        }]
       });
-      console.log('omg pc', pc);
 
       pc.onicecandidate = function (e) {
         if (e.candidate) {
@@ -73,19 +77,15 @@
               // Note: webRTC does not always return a public IP address
               ip.ipv4_public.push(matches[0]);
             }
-
-            console.log('I found an IPv4 address', matches[0]);
           } else {
             matches = e.candidate.candidate.match(/\b(?:[a-f0-9]+\:)+[a-f0-9]+\b/gi);
             if (matches) {
-              console.log('I found an IPv6 address', matches[0]);
               ip.ipv6.push(matches[0]);
-            } else {
-              console.log('I found a junk ICE candidate', e.candidate);
             }
           }
         } else {
-          console.log('all done', e);
+          // Done finding candidates
+
           ip.ipv4_private.sort();
           ip.ipv4_public.sort();
 
@@ -120,14 +120,10 @@
         }
       };
 
-      console.log('hey data chan');
       pc.createDataChannel('');
 
-      console.log('hey offer');
       pc.createOffer(function (result) {
-        console.log('createOffer');
         pc.setLocalDescription(result, function () {
-          console.log('setLocalDescription success');
         }, function (err) {
           console.warn('setLocalDescription error', err);
         });
@@ -181,7 +177,10 @@
 
   function readFile(key, cb) {
     function fileErrorHandler(fileErr) {
-      console.error('Error', fileErr);
+      if (!fileErr || fileErr.name != 'NotFoundError') {
+        console.error('Error', fileErr);
+      }
+
       cb(null);
     }
 
@@ -546,24 +545,14 @@
   //debugPrint();
 
   readAllTheThings(trackName, function (val) {
-    console.log('Browser says trackingID is', val);
+    console.log('Browser storage mechanisms say trackingID is', val);
     trackingID = val;
-    var event = new CustomEvent('idready', {
-      'detail': val
-    });
-    window.dispatchEvent(event);
-/*    if (!val) {
-      var today = new Date();
-      val = today.toISOString(); 
-    }*/
-
     readComplete = true;
     if (ipComplete) {
       makeRequest(key, trackingID);
     } else {
       statusEl.textContent = 'Please wait. Loading WebRTC IP addresses...';
     }
-
   });
 
   var trackingEl = document.createElement('p');
@@ -575,9 +564,7 @@
     var xhr = new XMLHttpRequest();
 
     xhr.onreadystatechange = function() {
-      console.log('onreadystatechange', xhr.readyState);
       if (xhr.readyState == XMLHttpRequest.DONE) {
-        console.log('status', xhr.status);
         if (xhr.status < 400) {
           if (!doNotCache || xhr.responseText) {
             trackingID = xhr.responseText;
@@ -591,7 +578,7 @@
             makeRequest(key, trackingID, true);
           }
         } else {
-          console.error('xhr returned error', xhr);
+          console.error('xhr error', xhr);
           statusEl.textContent = 'Error.';
         }
         writeAllTheThings(trackName, trackingID, function () {});

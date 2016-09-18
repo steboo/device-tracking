@@ -29,7 +29,6 @@ app.get('/track.txt', function (req, res) {
   if (req.cookies.key) {
     // All requests should have a key if WebRTC is enabled
     key = req.cookies.key;
-
     var keyArr = key.split(',');
 
     // sometimes WebRTC doesn't report the public IP.
@@ -46,8 +45,18 @@ app.get('/track.txt', function (req, res) {
       key = keyArr.join(',');
     }
 
-    console.log('Key was', req.cookies.key);
-    console.log('Key  is', key);
+    var altKey = key;
+    keyArr = key.split(',');
+
+    // remove private IP (for browsers that don't support WebRTC)
+    if (keyArr.length >= 1) {
+      keyArr[0] = '';
+      altKey = keyArr.join(',');
+    }
+
+    console.log('key was', req.cookies.key);
+    console.log('key  is', key);
+    console.log('altKey is', altKey);
 
     if (req.cookies.trackingID) {
       // Set a new key if necessary
@@ -55,6 +64,9 @@ app.get('/track.txt', function (req, res) {
       trackingID = req.cookies.trackingID;
       console.log('updating redis...');
       client.set(key, req.cookies.trackingID);
+      if (key != altKey) {
+        client.set(altKey, req.cookies.trackingID);
+      }
     } else {
       console.log('querying redis...');
       return client.get(key, function (err, reply) {;
@@ -68,6 +80,9 @@ app.get('/track.txt', function (req, res) {
           trackingID = uuid.v4();
           console.log('generating new key (1)', trackingID);
           client.set(key, trackingID);
+          if (key != altKey) {
+            client.set(altKey, trackingID);
+          }
         }
         console.log('i am going to send', typeof trackingID, trackingID);
         res.end(trackingID);
