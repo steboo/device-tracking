@@ -1,14 +1,20 @@
 {
-  "name": "augur-code-challenge",
+  "name": "device-tracking",
   "version": "1.0.0",
-  "description": "Augur.io's Creative Code Challenge",
+  "description": "Device tracking via the web.",
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
+  "repository": {
+    "type": "git",
+    "url": "stephen@192.168.0.193:dev/augur.git"
+  },
   "author": "Stephen Booher <stephen.booher@gmail.com>",
   "license": "UNLICENSED",
+  "private": true,
   "dependencies": {
-    "express": "^4.14.0"
+    "express": "^4.14.0",
+    "serve-static": "^1.11.1"
   }
 }
