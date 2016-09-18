@@ -84,6 +84,11 @@ app.get('/track.txt', function (req, res) {
 
   res.header('Content-Type', 'text/plain');
   console.log('i am going to send', typeof trackingID, trackingID);
+  if (!trackingID) {
+    // don't cache empty responses
+    res.status(404);
+  }
+
   res.end(trackingID);
 });
 
