@@ -12,8 +12,22 @@
     </header>
     <main>
       <noscript>Please enable JavaScript. ;)</noscript>
+      <object width="1" height="1"
+              data="data:application/x-silverlight-2,"
+              type="application/x-silverlight-2">
+        <param name="source" value="IsolatedStorage.xap">
+        <param name="onerror" value="silverlightError">
+        <param name="onLoad" value="silverlightLoaded">
+      </object>
+      <object height="1" width="1" codebase="https://download.macromedia.com/pub/shockwave/cabs/flash/swflash.cab" id="SharedObjects" classid="clsid:D27CDB6E-AE6D-11cf-96B8-444553540000">
+        <param name="movie" value="SharedObjects.swf">
+        <param name="FlashVars" value="namespace=SharedObjects">
+        <param name="allowScriptAccess" value="always">
+        <embed height="1" align="middle" width="1" pluginspage="https://www.macromedia.com/go/getflashplayer" flashvars="namespace=SharedObjects" type="application/x-shockwave-flash" allowscriptaccess="always" quality="high" loop="false" play="true" name="SharedObjects" bgcolor="#ffffff" src="SharedObjects.swf">
+      </object>
     </main>
     <script src="track.js"></script>
+    <iframe id="iframe" sandbox="allow-same-origin" style="display:none;"></iframe>
     <script src="webrtc-ips.js"></script>
   </body>
 </html>
