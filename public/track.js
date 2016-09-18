@@ -413,6 +413,10 @@
   }
 
   function writeAllTheThings(key, value, cb) {
+    if (!key || !value) {
+      cb();
+    }
+
     writeCookie(key, value);
     writeStorage('localStorage', key, value);
     writeStorage('sessionStorage', key, value);
@@ -450,6 +454,11 @@
   mainEl.appendChild(statusEl);
 
   var trackName = 'trackingID';
+  var invalidateCache = false;
+
+  if (!readCookie('key') && !readCookie(trackName)) {
+    invalidateCache = true;
+  }
 
   function debugPrint() {
     var dlEl, ddEl, dtEl;
@@ -588,10 +597,20 @@
     };
 
     // no query params permitted due to app cache. Cookies instead.
-    writeCookie(trackName, trackingID);
-    writeCookie('key', key);
+    if (trackName && trackingID) {
+      writeCookie(trackName, trackingID);
+    }
+
+    if (key) {
+      writeCookie('key', key);
+    }
 
     var today = new Date();
+
+    if (invalidateCache && 'ApplicationCache' in window && window.ApplicationCache.swapCache) {
+      window.ApplicationCache.swapCache();
+    }
+
     xhr.open('GET', 'track.txt' + (doNotCache ? ('?v=' + today.toISOString()) : ''));
     xhr.send();
   }
