@@ -470,7 +470,7 @@
     dlEl.appendChild(dtEl);
     ddEl = document.createElement('dd');
     var cookieVal = readCookie(trackName);
-    ddEl.textContent = cookieVal ? cookieVal : '';
+    ddEl.textContent = typeof cookieVal == 'string' ? cookieVal : '';
     dlEl.appendChild(ddEl);
 
     dtEl = document.createElement('dt');
@@ -542,6 +542,8 @@
 
     mainEl.appendChild(dlEl);
   }
+
+  //debugPrint();
 
   readAllTheThings(trackName, function (val) {
     console.log('Browser says trackingID is', val);
