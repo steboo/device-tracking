@@ -57,7 +57,14 @@ SOFTWARE.
     function handleCandidate(candidate){
       //match just the IP address
       var ip_regex = /([0-9]{1,3}(\.[0-9]{1,3}){3}|[a-f0-9]{1,4}(:[a-f0-9]{1,4}){7})/
-      var ip_addr = ip_regex.exec(candidate)[1];
+      var ip_addr_match = ip_regex.exec(candidate);
+      var ip_addr;
+      
+      if (ip_addr_match)
+        ip_addr = ip_addr_match[1];
+      else
+        return;
+
       //remove duplicates
       if(ip_dups[ip_addr] === undefined)
         callback(ip_addr);
@@ -95,6 +102,12 @@ SOFTWARE.
   var ipv6 = [],
     ipv4_public = [],
     ipv4_private = [];
+
+  if (navigator.userAgent.indexOf(' Edge/') >= 0) {
+    // user agent detection is bad, but I don't have time to track down errors
+    // like "Object doesn't support this action".
+    return;
+  }
 
   getIPs(function(ip){
     if (ip === null) {
