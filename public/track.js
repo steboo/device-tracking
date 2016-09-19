@@ -473,7 +473,9 @@
               return cb(val);
             }
 
-            readCacheableRequest(cb);
+            readCacheableRequest(function (xhr, val) {
+              return cb(val);
+            });
           });
         });
       });
