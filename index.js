@@ -54,21 +54,16 @@ app.get('/track.txt', function (req, res) {
       altKey = keyArr.join(',');
     }
 
-    console.log('key was', req.cookies.key);
-    console.log('key  is', key);
-    console.log('altKey is', altKey);
-
     if (req.cookies.trackingID) {
       // Set a new key if necessary
-      console.log('trackingID was', req.cookies.trackingID);
       trackingID = req.cookies.trackingID;
-      console.log('updating redis...');
+      console.log('Updating redis...', key, trackingID);
       client.set(key, req.cookies.trackingID);
       if (key != altKey) {
         client.set(altKey, req.cookies.trackingID);
       }
     } else {
-      console.log('querying redis...');
+      console.log('Querying redis...', key);
       return client.get(key, function (err, reply) {;
         if (reply) {
           var trackingID = reply;
@@ -78,13 +73,12 @@ app.get('/track.txt', function (req, res) {
           // We have no record of key, so generate new tracking ID.
           // Hopefully this is their first visit.
           trackingID = uuid.v4();
-          console.log('generating new key (1)', trackingID);
+          console.log('Generating new key (1)', trackingID);
           client.set(key, trackingID);
           if (key != altKey) {
             client.set(altKey, trackingID);
           }
         }
-        console.log('i am going to send', typeof trackingID, trackingID);
         res.end(trackingID);
       });
     }
@@ -94,11 +88,10 @@ app.get('/track.txt', function (req, res) {
   } else if (gen) {
     // Create a new trackingID if nothing is present
     trackingID = uuid.v4();
-    console.log('generating new key (2)', trackingID);
+    console.log('Generating new key (2)', trackingID);
   }
 
   res.header('Content-Type', 'text/plain');
-  console.log('i am going to send', typeof trackingID, trackingID);
   if (!trackingID) {
     // don't cache empty responses
     res.status(404);

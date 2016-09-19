@@ -377,7 +377,8 @@
 
 
   function readFlashSharedObject(key, count, cb) {
-    statusEl.textContent = 'Please wait. Loading Flash shared objects...';
+    //statusEl.textContent = 'Please wait. Loading Flash shared objects...';
+    statusEl.textContent = 'Please wait. Loading...';
     if (arguments.length == 2) {
       cb = count;
       count = 0;
@@ -431,7 +432,8 @@
     }
 
     function readIsolatedStorage(key, count, cb) {
-      statusEl.textContent = 'Please wait. Loading Silverlight Isolated Storage...';
+      //statusEl.textContent = 'Please wait. Loading Silverlight Isolated Storage...';
+      statusEl.textContent = 'Please wait. Loading...';
       if (arguments.length == 2) {
         cb = count;
         count = 0;
@@ -617,7 +619,7 @@
     mainEl.appendChild(dlEl);
   }
 
-  debugPrint();
+  //debugPrint();
 
   readAllTheThings(trackName, function (value) {
     readComplete = true;
@@ -627,7 +629,8 @@
     if (ipComplete) {
       sendUpdateRequest(key, trackingID);
     } else {
-      statusEl.textContent = 'Please wait. Loading WebRTC IP addresses...';
+      //statusEl.textContent = 'Please wait. Loading WebRTC IP addresses...';
+      statusEl.textContent = 'Please wait. Loading...';
     }
   });
 
