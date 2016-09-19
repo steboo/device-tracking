@@ -473,7 +473,7 @@
               return cb(val);
             }
 
-            getCachableRequest(key, cb);
+            getCacheableRequest(key, cb);
           });
         });
       });
