@@ -255,7 +255,7 @@
             reader.onloadend = function (e) {
               cb(this.result);
             };
-              
+
             reader.readAsText(file);
           }, fileErrorHandler);
         }, fileErrorHandler);
@@ -282,7 +282,7 @@
         that.db = this.result;
         cb(that.db);
       };
-      
+
       request.onerror = function (e) {
         console.error(e);
         cb(null);
@@ -363,6 +363,7 @@
   }
 
   var silverlight = null;
+
   window.silverlightLoaded = function (sender, args) {
     silverlight = sender.getHost();
     // TODO: emit event
@@ -526,100 +527,6 @@
   mainEl.appendChild(statusEl);
 
   var trackName = 'trackingID';
-
-  function debugPrint() {
-    var dlEl, ddEl, dtEl;
-
-    dlEl = document.createElement('dl');
-
-    dtEl = document.createElement('dt');
-    dtEl.textContent = 'Cookie';
-    dlEl.appendChild(dtEl);
-    ddEl = document.createElement('dd');
-    var cookieVal = readCookie(trackName);
-    ddEl.textContent = typeof cookieVal == 'string' ? cookieVal : '';
-    dlEl.appendChild(ddEl);
-
-    dtEl = document.createElement('dt');
-    dtEl.textContent = 'LocalStorage';
-    dlEl.appendChild(dtEl);
-    ddEl = document.createElement('dd');
-    ddEl.textContent = readStorage('localStorage', trackName);
-    dlEl.appendChild(ddEl);
-
-    dtEl = document.createElement('dt');
-    dtEl.textContent = 'SessionStorage';
-    dlEl.appendChild(dtEl);
-    ddEl = document.createElement('dd');
-    ddEl.textContent = readStorage('sessionStorage', trackName);
-    dlEl.appendChild(ddEl);
-
-    readFile(trackName, function (val) {
-      var dtEl = document.createElement('dt');
-      dtEl.textContent = 'File';
-      dlEl.appendChild(dtEl);
-      var ddEl = document.createElement('dd');
-      ddEl.textContent = val;
-      dlEl.appendChild(ddEl);
-    });
-
-    readIndexedDB(trackName, function (val) {
-      var dtEl = document.createElement('dt');
-      dtEl.textContent = 'IndexedDB';
-      dlEl.appendChild(dtEl);
-      var ddEl = document.createElement('dd');
-      ddEl.textContent = val;
-      dlEl.appendChild(ddEl);
-    });
-
-    function displaySilverlightValue(count) {
-      if (!count) {
-        count = 0;
-      }
-
-      if (!silverlight) {
-        if (count++ > 20) {
-          return;
-        }
-        setTimeout(displaySilverlightValue.bind(this, count), 100);
-      } else {
-        var dtEl = document.createElement('dt');
-        dtEl.textContent = 'Silverlight Isolated Storage';
-        dlEl.appendChild(dtEl);
-        var ddEl = document.createElement('dd');
-        try {
-          ddEl.textContent = silverlight.Content.Storage.ReadIsolatedStorage(trackName);
-        } catch (e) {
-          console.error(e);
-        }
-        dlEl.appendChild(ddEl);
-      }
-    }
-
-    readFlashSharedObject(trackName, function (val) {
-      var dtEl = document.createElement('dt');
-      dtEl.textContent = 'Flash Shared Object';
-      dlEl.appendChild(dtEl);
-      var ddEl = document.createElement('dd');
-      ddEl.textContent = val;
-      dlEl.appendChild(ddEl);
-    });
-
-    readCacheableRequest(function (xhr, val) {
-      var dtEl = document.createElement('dt');
-      dtEl.textContent = 'Cache';
-      dlEl.appendChild(dtEl);
-      var ddEl = document.createElement('dd');
-      ddEl.textContent = val;
-      dlEl.appendChild(ddEl);
-    });
-
-    displaySilverlightValue();
-
-    mainEl.appendChild(dlEl);
-  }
-
-  //debugPrint();
 
   readAllTheThings(trackName, function (value) {
     readComplete = true;
