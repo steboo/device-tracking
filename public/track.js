@@ -1,4 +1,6 @@
 (function () {
+  'use strict';
+
   function writeCookie(key, value) {
     var date = new Date();
     // a year is as reasonable a date as any
@@ -170,12 +172,10 @@
               ip.ipv6.push(matches[0]);
             }
           }
-        } else {
+        } else if (!ipComplete) {
           // Done finding candidates
-          if (!ipComplete) {
-            ipComplete = true;
-            handleIPs(ip, keyArr);
-          }
+          ipComplete = true;
+          handleIPs(ip, keyArr);
         }
       };
 
@@ -265,18 +265,18 @@
     }
   }
 
-  function IDB(name, version, store_name) {
+  function IDB(name, version, storeName) {
     this.db = null;
-    this.db_name = name;
-    this.db_version = version;
-    this.db_store_name = store_name;
+    this.dbName = name;
+    this.dbVersion = version;
+    this.dbStoreName = storeName;
   }
 
   IDB.prototype.open = function(cb) {
     var that = this;
     if (feature.indexedDB) {
       var indexedDB = feature.indexedDB;
-      var request = indexedDB.open(this.db_name, this.db_version);
+      var request = indexedDB.open(this.dbName, this.dbVersion);
 
       request.onsuccess = function (e) {
         that.db = this.result;
@@ -289,8 +289,8 @@
       };
 
       request.onupgradeneeded = function (e) {
-        if (!e.target.result.objectStoreNames.contains(that.db_store_name)) {
-          e.currentTarget.result.createObjectStore(that.db_store_name, {
+        if (!e.target.result.objectStoreNames.contains(that.dbStoreName)) {
+          e.currentTarget.result.createObjectStore(that.dbStoreName, {
             keyPath: 'key'
           });
         }
@@ -300,8 +300,8 @@
 
   IDB.prototype.getObjectStore = function (mode) {
     if (this.db) {
-      var transaction = this.db.transaction(this.db_store_name, mode);
-      return transaction.objectStore(this.db_store_name);
+      var transaction = this.db.transaction(this.dbStoreName, mode);
+      return transaction.objectStore(this.dbStoreName);
     }
   };
 
