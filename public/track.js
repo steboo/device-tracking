@@ -613,7 +613,7 @@
           writeCacheableRequest(trackingID, function () {});
         }
 
-        statusEl.style = 'display: none;';
+        statusEl.textContent = '';
         writeAllTheThings(trackName, trackingID, function () {});
       },
       function (xhr) {
