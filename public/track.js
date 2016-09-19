@@ -32,7 +32,7 @@
   var feature = {
     localStorage: storageAvailable('localStorage'),
     sessionStorage: storageAvailable('sessionStorage'),
-    fileSystem: window.requestFileSystem || window.webkitRequestFileSystem,
+    fileSystem: window.requestFileSystem || window.webkitRequestFileSystem, // Chrome and FF 50+
     indexedDB: window.indexedDB || window.mozIndexedDB || window.webkitIndexedDB || window.msIndexedDB,
     flash: document.SharedObjects || window.SharedObjects,
     webRTC: window.RTCPeerConnection || window.mozRTCPeerConnection || window.webkitRTCPeerConnection
@@ -49,7 +49,94 @@
     ipv6: []
   };
 
-  function rtc() {
+  function getDeviceKey() {
+    var keyArr = [
+      '', // local ip(s)
+      '', // public ip(s)
+      '', // screen width
+      '', // screen height
+      ''  // os
+    ];
+
+    // I am having problems on Android getting consistent screen sizes.
+    // This problem may be present across all mobile devices (not sure yet).
+    if (!navigator.userAgent || !navigator.userAgent.match(/(?:Android|BlackBerry|IEMobile|iPhone|iPad|iPod|Kindle Fire|Opera Mini|WPDesktop)/i)) {
+      keyArr[2] = String(screen.width);
+      keyArr[3] = String(screen.height);
+    }
+
+    // These strings and regular expressions are from http://stackoverflow.com/a/18706818
+    // OS adds a little more entropy
+    var clientStrings = [
+      {s:'Windows 10', r:/(Windows 10.0|Windows NT 10.0)/},
+      {s:'Windows 8.1', r:/(Windows 8.1|Windows NT 6.3)/},
+      {s:'Windows 8', r:/(Windows 8|Windows NT 6.2)/},
+      {s:'Windows 7', r:/(Windows 7|Windows NT 6.1)/},
+      {s:'Windows Vista', r:/Windows NT 6.0/},
+      {s:'Windows Server 2003', r:/Windows NT 5.2/},
+      {s:'Windows XP', r:/(Windows NT 5.1|Windows XP)/},
+      {s:'Windows 2000', r:/(Windows NT 5.0|Windows 2000)/},
+      {s:'Windows ME', r:/(Win 9x 4.90|Windows ME)/},
+      {s:'Windows 98', r:/(Windows 98|Win98)/},
+      {s:'Windows 95', r:/(Windows 95|Win95|Windows_95)/},
+      {s:'Windows NT 4.0', r:/(Windows NT 4.0|WinNT4.0|WinNT|Windows NT)/},
+      {s:'Windows CE', r:/Windows CE/},
+      {s:'Windows 3.11', r:/Win16/},
+      {s:'Android', r:/Android/},
+      {s:'Open BSD', r:/OpenBSD/},
+      {s:'Sun OS', r:/SunOS/},
+      {s:'Linux', r:/(Linux|X11)/},
+      {s:'iOS', r:/(iPhone|iPad|iPod)/},
+      {s:'Mac OS X', r:/Mac OS X/},
+      {s:'Mac OS', r:/(MacPPC|MacIntel|Mac_PowerPC|Macintosh)/},
+      {s:'QNX', r:/QNX/},
+      {s:'UNIX', r:/UNIX/},
+      {s:'BeOS', r:/BeOS/},
+      {s:'OS/2', r:/OS\/2/}
+    ];
+
+    for (var i = 0; i < clientStrings.length; i++) {
+      if (clientStrings[i].r.test(navigator.userAgent)) {
+        keyArr[4] = clientStrings[i].s;
+        break;
+      }
+    }
+
+    // TODO: add fonts?
+
+    function handleIPs(ip, keyArr) {
+      // sort in case there are multiple Ps
+      ip.ipv4_private.sort();
+      ip.ipv4_public.sort();
+
+      // uniq w/ side effect
+      if (ip.ipv4_private.length > 1) {
+        ip.ipv4_private.reduce(function (p, c, i, a) {
+          if (p == c) {
+            a.splice(i, 1);
+          }
+        });
+      }
+
+      if (ip.ipv4_public.length > 1) {
+        ip.ipv4_public.reduce(function (p, c, i, a) {
+          if (p == c) {
+            a.splice(i, 1);
+          }
+        });
+      }
+
+      keyArr[0] = ip.ipv4_private.join('|');
+      keyArr[1] = ip.ipv4_public.join('|');
+      key = keyArr.join(',');
+      ipComplete = true;
+
+      if (readComplete) {
+        sendUpdateRequest(key, trackingID);
+      }
+    }
+
+
     if (feature.webRTC) {
       var pc = new feature.webRTC({
         iceServers: [
@@ -85,40 +172,20 @@
           }
         } else {
           // Done finding candidates
-
-          ip.ipv4_private.sort();
-          ip.ipv4_public.sort();
-
-          // uniq w/ side effect
-          if (ip.ipv4_private.length > 1) {
-            ip.ipv4_private.reduce(function (p, c, i, a) {
-              if (p == c) {
-                a.splice(i, 1);
-              }
-            });
-          }
-
-          if (ip.ipv4_public.length > 1) {
-            ip.ipv4_public.reduce(function (p, c, i, a) {
-              if (p == c) {
-                a.splice(i, 1);
-              }
-            });
-          }
-
-          var keyArr = [
-            ip.ipv4_private.join('|'),
-            ip.ipv4_public.join('|'),
-            String(screen.width),
-            String(screen.height)
-          ];
-          key = keyArr.join(',');
-          ipComplete = true;
-          if (readComplete) {
-            makeRequest(key, trackingID);
+          if (!ipComplete) {
+            ipComplete = true;
+            handleIPs(ip, keyArr);
           }
         }
       };
+
+      // Sometimes the done event is never fired.
+      setTimeout(function() {
+        if (!ipComplete) {
+          ipComplete = true;
+          handleIPs(ip, keyArr);
+        }
+      }, 2000);
 
       pc.createDataChannel('');
 
@@ -131,18 +198,12 @@
         console.warn('createOffer error', err);
       });
     } else {
-      var keyArr = [
-        '',
-        '',
-        String(screen.width),
-        String(screen.height)
-      ];
       key = keyArr.join(',');
       ipComplete = true;
     }
   }
 
-  rtc();
+  getDeviceKey();
 
   function writeStorage(type, key, value) {
     if (feature[type]) {
@@ -229,7 +290,9 @@
 
       request.onupgradeneeded = function (e) {
         if (!e.target.result.objectStoreNames.contains(that.db_store_name)) {
-          e.currentTarget.result.createObjectStore(that.db_store_name, { keyPath: 'key' });
+          e.currentTarget.result.createObjectStore(that.db_store_name, {
+            keyPath: 'key'
+          });
         }
       };
     }
@@ -405,7 +468,13 @@
             return cb(val);
           }
 
-          readFlashSharedObject(key, cb);
+          readFlashSharedObject(key, function (val) {
+            if (val) {
+              return cb(val);
+            }
+
+            getCachableRequest(key, cb);
+          });
         });
       });
     });
@@ -453,11 +522,6 @@
   mainEl.appendChild(statusEl);
 
   var trackName = 'trackingID';
-  var invalidateCache = false;
-
-  if (!readCookie('key') && !readCookie(trackName)) {
-    invalidateCache = true;
-  }
 
   function debugPrint() {
     var dlEl, ddEl, dtEl;
@@ -537,6 +601,15 @@
       dlEl.appendChild(ddEl);
     });
 
+    readCacheableRequest(function (xhr, val) {
+      var dtEl = document.createElement('dt');
+      dtEl.textContent = 'Cache';
+      dlEl.appendChild(dtEl);
+      var ddEl = document.createElement('dd');
+      ddEl.textContent = val;
+      dlEl.appendChild(ddEl);
+    });
+
     displaySilverlightValue();
 
     mainEl.appendChild(dlEl);
@@ -544,12 +617,13 @@
 
   //debugPrint();
 
-  readAllTheThings(trackName, function (val) {
-    console.log('Browser storage mechanisms say trackingID is', val);
-    trackingID = val;
+  readAllTheThings(trackName, function (value) {
     readComplete = true;
+    trackingID = value;
+    console.log('According to the browser storage mechanisms, the trackingID is', trackingID);
+
     if (ipComplete) {
-      makeRequest(key, trackingID);
+      sendUpdateRequest(key, trackingID);
     } else {
       statusEl.textContent = 'Please wait. Loading WebRTC IP addresses...';
     }
@@ -559,32 +633,56 @@
   trackingEl.classname = 'useful';
   mainEl.appendChild(trackingEl);
 
-  function makeRequest(key, trackingID, doNotCache) {
-    console.log('Making request with', key, trackingID);
+  function ajax(url, success, failure) {
+    console.log('XHMHttpRequest with ' + url, key, trackingID);
     var xhr = new XMLHttpRequest();
 
     xhr.onreadystatechange = function() {
       if (xhr.readyState == XMLHttpRequest.DONE) {
         if (xhr.status < 400) {
-          if (!doNotCache || xhr.responseText) {
-            trackingID = xhr.responseText;
-            trackingEl.textContent = 'Your device ID is ' + trackingID;
-          }
-
-          if (!doNotCache) {
-            statusEl.parentNode.removeChild(statusEl);
-            // we make two requests, one from the cache and one to update
-            // the network info if necessary
-            makeRequest(key, trackingID, true);
-          }
+          success(xhr);
         } else {
-          console.error('xhr error', xhr);
-          statusEl.textContent = 'Error.';
+          failure(xhr);
         }
-        writeAllTheThings(trackName, trackingID, function () {});
       }
     };
 
+    xhr.open('GET', url);
+    xhr.send();
+  }
+
+  function readCacheableRequest(cb) {
+    ajax('track.txt',
+      function (xhr) {
+        cb(xhr, xhr.responseText);
+      },
+      function (xhr) {
+        console.warn('XMLHttpRequest error', xhr);
+        cb(xhr);
+      }
+    );
+  }
+
+  function writeCacheableRequest(trackingID, cb) {
+    // TODO: figure out how to bypass the service worker cache for one request
+    if ('ApplicationCache' in window && window.ApplicationCache.swapCache) {
+      ApplicationCache.swapCache();
+    }
+
+    ajax('track.txt',
+      function (xhr) {
+        cb(xhr, xhr.responseText);
+      },
+      function (xhr) {
+        console.warn('XMLHttpRequest error', xhr);
+        cb(xhr);
+      }
+    );
+  }
+
+  // We need to make one uncached request with data from the client JS every
+  // page load in order to update the server-side database.
+  function sendUpdateRequest(key, trackingID) {
     // no query params permitted due to app cache. Cookies instead.
     if (trackName && trackingID) {
       writeCookie(trackName, trackingID);
@@ -595,13 +693,23 @@
     }
 
     var today = new Date();
+    ajax('track.txt?v=' + today.toISOString(),
+      function (xhr) {
+        if (xhr.responseText) {
+          trackingID = xhr.responseText;
+          trackingEl.textContent = 'Your device ID is ' + trackingID;
+          writeCacheableRequest(trackingID, function () {});
+        }
 
-    if (invalidateCache && 'ApplicationCache' in window && window.ApplicationCache.swapCache) {
-      window.ApplicationCache.swapCache();
-    }
-
-    xhr.open('GET', 'track.txt' + (doNotCache ? ('?v=' + today.toISOString()) : ''));
-    xhr.send();
+        statusEl.style = 'display: none;';
+        writeAllTheThings(trackName, trackingID, function () {});
+      },
+      function (xhr) {
+        console.error('XMLHttpRequest error', xhr);
+        statusEl.textContent = 'Error.';
+        writeAllTheThings(trackName, trackingID, function () {});
+      }
+    );
   }
 
   // Better close this tab before clearing cookies ;)
@@ -614,6 +722,7 @@
   window.addEventListener('beforeunload', unload, false);
   window.addEventListener('unload', unload, false);
 
+  // Register service worker for caching
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('./service-worker.js', { scope: './' }).then(function () {
       if (navigator.serviceWorker.controller) {
@@ -622,9 +731,5 @@
     }).catch(function (err) {
       console.warn(err);
     });
-  } else {
-    var pEl = document.createElement('p');
-    pEl.textContent = 'Service workers are not supported in this browser.';
-    mainEl.appendChild(pEl);
   }
 })();
