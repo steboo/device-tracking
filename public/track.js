@@ -473,7 +473,7 @@
               return cb(val);
             }
 
-            readCacheableRequest(key, cb);
+            readCacheableRequest(cb);
           });
         });
       });
@@ -615,7 +615,7 @@
     mainEl.appendChild(dlEl);
   }
 
-  //debugPrint();
+  debugPrint();
 
   readAllTheThings(trackName, function (value) {
     readComplete = true;
